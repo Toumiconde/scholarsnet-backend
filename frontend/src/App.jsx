@@ -6,20 +6,29 @@ import Search from './pages/Search';
 import Profile from './pages/Profile';
 import Network from './pages/Network';
 import LabStats from './pages/LabStats';
+import Admin from './pages/Admin';
+import Login from './pages/Login';
+import Landing from './pages/Landing';
+import { AuthProvider } from './lib/AuthContext';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
-          <Route path="search" element={<Search />} />
-          <Route path="profile/:uid" element={<Profile />} />
-          <Route path="network" element={<Network />} />
-          <Route path="stats/:labo" element={<LabStats />} />
-        </Route>
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Landing />} />
+            <Route path="dashboard" element={<Home />} />
+            <Route path="search" element={<Search />} />
+            <Route path="profile/:uid" element={<Profile />} />
+            <Route path="network" element={<Network />} />
+            <Route path="stats/:labo" element={<LabStats />} />
+            <Route path="admin" element={<Admin />} />
+            <Route path="login" element={<Login />} />
+          </Route>
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
 

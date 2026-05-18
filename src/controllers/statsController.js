@@ -1,4 +1,5 @@
 const Publication = require('../models/Publication');
+const Chercheur = require('../models/Chercheur');
 
 // Pipeline 1 — Co-auteurs d'un chercheur ($unwind + $group)
 exports.coauteurs = async (req, res) => {

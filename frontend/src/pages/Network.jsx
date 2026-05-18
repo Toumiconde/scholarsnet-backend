@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Network as NetworkIcon, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
@@ -60,6 +61,7 @@ export default function Network() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const navigate = useNavigate();
   const handleZoomIn = useCallback(() => { fgRef.current?.zoom(fgRef.current.zoom() * 1.2, 400); }, []);
   const handleZoomOut = useCallback(() => { fgRef.current?.zoom(fgRef.current.zoom() / 1.2, 400); }, []);
   const handleFit = useCallback(() => { fgRef.current?.zoomToFit(400); }, []);
@@ -105,6 +107,7 @@ export default function Network() {
                   onNodeClick={node => {
                     fgRef.current.centerAt(node.x, node.y, 1000);
                     fgRef.current.zoom(2, 2000);
+                    setTimeout(() => navigate(`/profile/${node.id}`), 500);
                   }}
                   nodeCanvasObject={(node, ctx, globalScale) => {
                     const label = node.name;

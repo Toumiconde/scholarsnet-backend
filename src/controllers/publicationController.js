@@ -39,6 +39,12 @@ exports.getOne = async (req, res) => {
 // Créer
 exports.create = async (req, res) => {
     try {
+        if (req.user.role !== 'admin') {
+            const isAuthor = req.body.auteurs && req.body.auteurs.some(a => a.uid === req.user.uid);
+            if (!isAuthor) {
+                return res.status(403).json({ message: "Action non autorisée : vous devez être auteur." });
+            }
+        }
         const pub = await Publication.create(req.body);
         res.status(201).json(pub);
     } catch (err) {
@@ -49,10 +55,18 @@ exports.create = async (req, res) => {
 // Modifier
 exports.update = async (req, res) => {
     try {
-        const pub = await Publication.findOneAndUpdate(
+        const pub = await Publication.findOne({ pid: req.params.pid });
+        if (!pub) return res.status(404).json({ message: 'Non trouvé' });
+
+        const isAuthor = pub.auteurs && pub.auteurs.some(a => a.uid === req.user.uid);
+        if (!isAuthor && req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Action non autorisée" });
+        }
+
+        const updatedPub = await Publication.findOneAndUpdate(
             { pid: req.params.pid }, req.body, { new: true }
         );
-        res.json(pub);
+        res.json(updatedPub);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -61,6 +75,14 @@ exports.update = async (req, res) => {
 // Supprimer
 exports.remove = async (req, res) => {
     try {
+        const pub = await Publication.findOne({ pid: req.params.pid });
+        if (!pub) return res.status(404).json({ message: 'Non trouvé' });
+
+        const isAuthor = pub.auteurs && pub.auteurs.some(a => a.uid === req.user.uid);
+        if (!isAuthor && req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Action non autorisée" });
+        }
+
         await Publication.findOneAndDelete({ pid: req.params.pid });
         res.json({ message: 'Publication supprimée' });
     } catch (err) {
@@ -71,6 +93,9 @@ exports.remove = async (req, res) => {
 // Import en masse JSON/DBLP
 exports.importJSON = async (req, res) => {
     try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Seul un administrateur peut importer des données." });
+        }
         const data = JSON.parse(req.file.buffer.toString());
         const pubs = Array.isArray(data) ? data : data.publications || [];
         const result = await Publication.insertMany(pubs, { ordered: false });

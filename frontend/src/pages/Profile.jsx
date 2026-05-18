@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Award, BookOpen, Briefcase, Mail, MapPin, Building, Activity } from 'lucide-react';
+import { User, Award, BookOpen, Briefcase, Mail, MapPin, Building, Edit3, Share2, Activity } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../lib/api';
 
 export default function Profile() {
   const { uid } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({});
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -21,10 +24,17 @@ export default function Profile() {
               { pid: 'PUB001', titre: "Détection d'entités nommées en langues africaines avec BERT", annee: 2023, type: 'article', citations: new Array(15) },
               { pid: 'PUB002', titre: "Modèles de langage pour l'Afrique de l'Ouest", annee: 2022, type: 'inproceedings', citations: new Array(10) }
             ],
-            projets: [{ nom: 'AfriNLP', statut: 'en_cours' }]
+            projets: [{ nom: 'AfriNLP', statut: 'en_cours' }],
+            statsEvolution: [
+              { annee: 2020, count: 2 },
+              { annee: 2021, count: 5 },
+              { annee: 2022, count: 4 },
+              { annee: 2023, count: 8 }
+            ]
           }
         }));
         setData(res.data);
+        setFormData(res.data.chercheur);
       } catch (err) {
         console.error(err);
       } finally {
@@ -37,7 +47,7 @@ export default function Profile() {
   if (loading) return <div className="flex justify-center items-center h-64"><span className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></span></div>;
   if (!data) return <div className="text-center py-20">Profil introuvable</div>;
 
-  const { chercheur, hIndex, publications, projets } = data;
+  const { chercheur, hIndex, publications, projets, statsEvolution } = data;
 
   return (
     <div className="space-y-6">
@@ -52,10 +62,20 @@ export default function Profile() {
           </div>
           
           <div className="flex-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-3">
-              <Award size={16} /> {chercheur.grade}
+            <div className="flex justify-between items-start">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-3">
+                  <Award size={16} /> {chercheur.grade}
+                </div>
+                <h1 className="text-4xl font-bold text-white mb-2">{chercheur.prenom} <span className="text-gradient">{chercheur.nom}</span></h1>
+              </div>
+              <button 
+                onClick={() => setIsEditing(true)}
+                className="hidden md:flex items-center gap-2 px-4 py-2 rounded-xl bg-surface border border-border text-white hover:bg-white/5 transition-colors"
+              >
+                <Edit3 size={16} /> Modifier
+              </button>
             </div>
-            <h1 className="text-4xl font-bold text-white mb-2">{chercheur.prenom} <span className="text-gradient">{chercheur.nom}</span></h1>
             
             <div className="flex flex-wrap gap-4 text-muted mt-4">
               <span className="flex items-center gap-2"><Building size={18}/> {chercheur.laboratoire} - {chercheur.universite}</span>
@@ -110,6 +130,36 @@ export default function Profile() {
         <div className="space-y-6">
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="glass-panel p-6">
             <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-3">
+              <Activity className="text-primary" /> Évolution (Publications)
+            </h2>
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={statsEvolution || []}>
+                  <XAxis dataKey="annee" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }} cursor={{ fill: '#334155', opacity: 0.4 }} />
+                  <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }} className="glass-panel p-6">
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-3">
+              <Share2 className="text-purple-500" /> Collaborateurs (Top 5)
+            </h2>
+            <div className="space-y-3">
+              {/* This normally comes from Pipeline 1 in the backend, simulated here for UI completeness */}
+              {['Diallo F.', 'Camara A.', 'Bah A.', 'Sow M.', 'Sylla O.'].map((nom, i) => (
+                <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-surface/50 border border-border">
+                  <span className="font-medium text-white flex items-center gap-2"><User size={14} className="text-muted"/> {nom}</span>
+                  <span className="text-xs text-muted font-medium bg-white/5 px-2 py-1 rounded-md">{10 - i} pubs</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }} className="glass-panel p-6">
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-3">
               <Briefcase className="text-secondary" /> Projets Actifs
             </h2>
             <div className="space-y-3">
@@ -123,6 +173,60 @@ export default function Profile() {
           </motion.div>
         </div>
       </div>
+
+      {/* Modal Edition Profil */}
+      {isEditing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }} 
+            animate={{ opacity: 1, scale: 1 }} 
+            className="glass-panel w-full max-w-lg p-6 bg-surface border border-border rounded-2xl"
+          >
+            <h2 className="text-2xl font-bold text-white mb-6">Modifier le Profil</h2>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-muted mb-1">Prénom</label>
+                  <input type="text" value={formData.prenom || ''} onChange={e => setFormData({...formData, prenom: e.target.value})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" />
+                </div>
+                <div>
+                  <label className="block text-sm text-muted mb-1">Nom</label>
+                  <input type="text" value={formData.nom || ''} onChange={e => setFormData({...formData, nom: e.target.value})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-muted mb-1">Grade</label>
+                <select value={formData.grade || ''} onChange={e => setFormData({...formData, grade: e.target.value})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary">
+                  <option value="Professeur">Professeur</option>
+                  <option value="Maître de conférences">Maître de conférences</option>
+                  <option value="Doctorant">Doctorant</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-muted mb-1">Laboratoire</label>
+                <input type="text" value={formData.laboratoire || ''} onChange={e => setFormData({...formData, laboratoire: e.target.value})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" />
+              </div>
+              <div>
+                <label className="block text-sm text-muted mb-1">Domaines (séparés par des virgules)</label>
+                <input type="text" value={formData.domaines_recherche?.join(', ') || ''} onChange={e => setFormData({...formData, domaines_recherche: e.target.value.split(',').map(s=>s.trim())})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-8">
+              <button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-xl bg-surface border border-border text-white hover:bg-white/5 transition-colors">Annuler</button>
+              <button 
+                onClick={() => {
+                  // In a real app, you would do: await api.put(`/chercheurs/${uid}`, formData);
+                  setData({ ...data, chercheur: formData });
+                  setIsEditing(false);
+                }} 
+                className="px-4 py-2 rounded-xl bg-primary text-white hover:bg-blue-600 transition-colors shadow-lg shadow-primary/25"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

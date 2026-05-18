@@ -1,3 +1,4 @@
+const Chercheur = require('../models/Chercheur');
 const Publication = require('../models/Publication');
 const Projet = require('../models/Projet');
 
@@ -21,13 +22,23 @@ exports.getOne = async (req, res) => {
     try {
         const chercheur = await Chercheur.findOne({ uid: req.params.uid }).select('-password');
         if (!chercheur) return res.status(404).json({ message: 'Non trouvé' });
-        const publications = await Publication.find({ 'auteurs.uid': req.params.uid }).sort({ annee: -1 });
-        // Calcul h-index
-        const sorted = publications.map(p => p.citations?.length || 0).sort((a, b) => b - a);
+        const publicationsAgg = await Publication.aggregate([
+            { $match: { 'auteurs.uid': req.params.uid } },
+            { $project: { 
+                pid: 1, 
+                titre: 1, 
+                annee: 1,
+                nb_citations: { $size: { $ifNull: ['$citations', []] } } 
+            }},
+            { $sort: { nb_citations: -1 } }
+        ]);
+
         let hIndex = 0;
-        for (let i = 0; i < sorted.length; i++) {
-            if (sorted[i] >= i + 1) hIndex = i + 1; else break;
+        for (let i = 0; i < publicationsAgg.length; i++) {
+            if (publicationsAgg[i].nb_citations >= i + 1) hIndex = i + 1; else break;
         }
+
+        const publications = await Publication.find({ 'auteurs.uid': req.params.uid }).sort({ annee: -1 });
 
         // Récupérer les projets
         const projets = await Projet.find({

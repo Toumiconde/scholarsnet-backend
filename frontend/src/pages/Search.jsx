@@ -7,11 +7,13 @@ export default function Search() {
   const [query, setQuery] = useState('');
   const [type, setType] = useState('');
   const [annee, setAnnee] = useState('');
+  const [auteur, setAuteur] = useState('');
+  const [page, setPage] = useState(1);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
 
-  const handleSearch = async (e) => {
+  const handleSearch = async (e, newPage = 1) => {
     if (e) e.preventDefault();
     setLoading(true);
     try {
@@ -19,10 +21,13 @@ export default function Search() {
       if (query) params.append('q', query);
       if (type) params.append('type', type);
       if (annee) params.append('annee', annee);
+      if (auteur) params.append('auteur', auteur);
+      params.append('page', newPage);
       
       const { data } = await api.get(`/publications?${params.toString()}`);
       setResults(data.publications || []);
       setTotal(data.total || 0);
+      setPage(newPage);
     } catch (err) {
       console.error(err);
       // Fallback for demo if backend is not running
@@ -75,6 +80,16 @@ export default function Search() {
               <option value="book">Livre</option>
               <option value="report">Rapport</option>
             </select>
+          </div>
+          <div className="w-full md:w-48 relative">
+            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={18} />
+            <input 
+              type="text" 
+              placeholder="Auteur" 
+              value={auteur}
+              onChange={(e) => setAuteur(e.target.value)}
+              className="w-full bg-surface/50 border border-border rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary transition-all"
+            />
           </div>
           <div className="w-full md:w-32 relative">
             <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" size={18} />
@@ -146,6 +161,27 @@ export default function Search() {
           )
         )}
       </div>
+
+      {/* Pagination */}
+      {total > 20 && (
+        <div className="flex justify-center items-center gap-4 mt-8">
+          <button 
+            disabled={page === 1} 
+            onClick={() => handleSearch(null, page - 1)}
+            className="px-4 py-2 bg-surface border border-border rounded-lg text-white disabled:opacity-50 hover:bg-white/5 transition-colors"
+          >
+            Précédent
+          </button>
+          <span className="text-muted text-sm">Page {page}</span>
+          <button 
+            disabled={page * 20 >= total}
+            onClick={() => handleSearch(null, page + 1)}
+            className="px-4 py-2 bg-surface border border-border rounded-lg text-white disabled:opacity-50 hover:bg-white/5 transition-colors"
+          >
+            Suivant
+          </button>
+        </div>
+      )}
     </div>
   );
 }
