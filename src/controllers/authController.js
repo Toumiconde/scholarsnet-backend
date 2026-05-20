@@ -40,3 +40,104 @@ exports.me = async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 };
+
+// Demande de réinitialisation de mot de passe (Mot de passe oublié)
+exports.forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ message: "L'adresse email est requise." });
+
+        const chercheur = await Chercheur.findOne({ email });
+        if (!chercheur) return res.status(404).json({ message: "Aucun chercheur trouvé avec cet email." });
+
+        const crypto = require('crypto');
+        const token = crypto.randomBytes(32).toString('hex');
+
+        // Utiliser updateOne pour éviter les erreurs de validation Mongoose sur le mot de passe manquant
+        await Chercheur.updateOne(
+            { _id: chercheur._id },
+            {
+                $set: {
+                    resetPasswordToken: token,
+                    resetPasswordExpires: Date.now() + 3600000 // Valide 1 heure
+                }
+            }
+        );
+
+        // En local, on retourne le lien pour pouvoir le copier/tester facilement
+        const resetLink = `http://localhost:5173/reset-password/${token}`;
+        res.json({
+            message: "Lien de réinitialisation généré avec succès.",
+            token,
+            resetLink
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Réinitialisation effective du mot de passe via Token
+exports.resetPassword = async (req, res) => {
+    try {
+        const { token } = req.params;
+        const { password } = req.body;
+        if (!password) return res.status(400).json({ message: "Le nouveau mot de passe est requis." });
+
+        const chercheur = await Chercheur.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: Date.now() }
+        });
+
+        if (!chercheur) {
+            return res.status(400).json({ message: "Le lien de réinitialisation est invalide ou a expiré." });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Utiliser updateOne pour la réinitialisation
+        await Chercheur.updateOne(
+            { _id: chercheur._id },
+            {
+                $set: { password: hashedPassword },
+                $unset: { resetPasswordToken: 1, resetPasswordExpires: 1 }
+            }
+        );
+
+        res.json({ message: "Votre mot de passe a été modifié avec succès." });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Réinitialisation par l'Administrateur
+exports.adminResetPassword = async (req, res) => {
+    try {
+        // Sécurité : Vérifier le rôle admin (protection préalable par protect middleware)
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: "Accès refusé. Réservé à l'administrateur." });
+        }
+
+        const { uid, password } = req.body;
+        if (!uid || !password) {
+            return res.status(400).json({ message: "L'UID du chercheur et le nouveau mot de passe sont requis." });
+        }
+
+        const chercheur = await Chercheur.findOne({ uid });
+        if (!chercheur) return res.status(404).json({ message: "Chercheur non trouvé." });
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Utiliser updateOne pour contourner la validation du mot de passe manquant
+        await Chercheur.updateOne(
+            { _id: chercheur._id },
+            {
+                $set: { password: hashedPassword },
+                $unset: { resetPasswordToken: 1, resetPasswordExpires: 1 }
+            }
+        );
+
+        res.json({ message: `Le mot de passe du chercheur ${chercheur.prenom} ${chercheur.nom} (${uid}) a été réinitialisé.` });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};

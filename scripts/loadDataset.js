@@ -15,7 +15,12 @@ const loadData = async () => {
     // Pour éviter les doublons (facultatif si la base est vide)
     await Publication.deleteMany({});
     
-    const result = await Publication.insertMany(data, { ordered: false });
+    const enrichedData = data.map(p => ({
+      statut: p.statut || 'publie',
+      ...p
+    }));
+    
+    const result = await Publication.insertMany(enrichedData, { ordered: false });
     console.log(`${result.length} publications insérées avec succès en BDD.`);
     
     process.exit(0);

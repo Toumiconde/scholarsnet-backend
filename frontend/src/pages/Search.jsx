@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search as SearchIcon, Filter, BookOpen, User, Calendar, Tag } from 'lucide-react';
 import api from '../lib/api';
@@ -124,16 +125,35 @@ export default function Search() {
                 <BookOpen className={pub.type === 'article' ? 'text-blue-400' : pub.type === 'thesis' ? 'text-purple-400' : 'text-emerald-400'} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex flex-wrap items-center gap-3 mb-2">
                   <span className="text-xs font-semibold px-2 py-1 rounded-md bg-surface text-muted uppercase tracking-wider">
                     {pub.type}
                   </span>
                   <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-md">
                     {pub.annee}
                   </span>
+                  {pub.statut === 'brouillon' && <span className="text-xs font-semibold px-2 py-1 rounded-md bg-zinc-500/10 text-zinc-400 border border-zinc-500/20 uppercase tracking-wider">📝 Brouillon</span>}
+                  {pub.statut === 'en_cours' && <span className="text-xs font-semibold px-2 py-1 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-wider">⚙️ En cours</span>}
+                  {pub.statut === 'soumis' && <span className="text-xs font-semibold px-2 py-1 rounded-md bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 uppercase tracking-wider">📤 Soumis</span>}
+                  {pub.statut === 'revision' && <span className="text-xs font-semibold px-2 py-1 rounded-md bg-orange-500/10 text-orange-400 border border-orange-500/20 uppercase tracking-wider">🔄 Révision</span>}
+                  {(pub.statut === 'publie' || !pub.statut) && <span className="text-xs font-semibold px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">✅ Publié</span>}
                   <span className="text-xs text-muted">ID: {pub.pid}</span>
                 </div>
-                <h3 className="text-xl font-bold text-white mb-3 leading-tight">{pub.titre}</h3>
+                <h3 className="text-xl font-bold text-white mb-3 leading-tight">
+                  <Link to={`/publication/${pub.pid}`} className="hover:text-primary transition-colors">
+                    {pub.titre}
+                  </Link>
+                </h3>
+                {pub.statut === 'en_cours' && (
+                  <p className="text-sm text-blue-400/80 italic mb-3 flex items-center gap-1.5 bg-blue-500/5 px-3 py-1.5 rounded-lg border border-blue-500/10 w-fit">
+                    <span>⚙️</span> "Cette recherche est en cours de rédaction"
+                  </p>
+                )}
+                {pub.statut === 'revision' && (
+                  <p className="text-sm text-orange-400/80 italic mb-3 flex items-center gap-1.5 bg-orange-500/5 px-3 py-1.5 rounded-lg border border-orange-500/10 w-fit">
+                    <span>🔄</span> "Cette publication est en cours de révision"
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2 mb-4">
                   {pub.auteurs?.map((auteur, i) => (
                     <span key={i} className="inline-flex items-center gap-1 text-sm text-secondary bg-secondary/10 px-2 py-1 rounded-md">

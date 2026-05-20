@@ -1,9 +1,11 @@
 const Projet = require('../models/Projet');
 
-// Liste tous les projets
+// Liste tous les projets (supporte ?statut=en_cours|planifie|termine|suspendu)
 exports.getAll = async (req, res) => {
     try {
-        const projets = await Projet.find();
+        const filter = {};
+        if (req.query.statut) filter.statut = req.query.statut;
+        const projets = await Projet.find(filter).sort({ createdAt: -1 });
         res.json(projets);
     } catch (err) {
         res.status(500).json({ error: err.message });

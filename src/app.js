@@ -8,12 +8,16 @@ connectDB();
 app.use(cors());
 app.use(express.json());
 
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/chercheurs', require('./routes/chercheurs'));
 app.use('/api/projets', require('./routes/projets'));
 app.use('/api/publications', require('./routes/publications'));
 app.use('/api/stats', require('./routes/stats'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 app.listen(process.env.PORT, () =>
     console.log(`Serveur lancé sur le port ${process.env.PORT}`)

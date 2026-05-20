@@ -14,6 +14,9 @@ const chercheurSchema = new mongoose.Schema({
     actif: { type: Boolean, default: true },
     role: { type: String, enum: ['chercheur', 'admin'], default: 'chercheur' },
     password: { type: String, required: true },
+    photo: String,
+    resetPasswordToken: String,
+    resetPasswordExpires: Date
 }, { timestamps: true });
 
 // Index

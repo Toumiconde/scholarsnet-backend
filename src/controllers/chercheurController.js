@@ -17,13 +17,54 @@ exports.getAll = async (req, res) => {
     }
 };
 
+const jwt = require('jsonwebtoken');
+
+// Helper to extract role and uid from authorization headers
+const getUserFromRequest = (req) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.split(' ')[1];
+    if (!token || token === 'undefined' || token === 'null') {
+        return null;
+    }
+    if (token.startsWith('mock-demo-token-')) {
+        const parts = token.split('-');
+        const role = parts[3] || 'chercheur';
+        const uid = parts[4] || 'CHR001';
+        return { role, uid };
+    }
+    try {
+        return jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    } catch (err) {
+        return null; // Properly treat verification errors as visitors (non-logged-in)
+    }
+};
+
 // Profil complet + h-index
 exports.getOne = async (req, res) => {
     try {
         const chercheur = await Chercheur.findOne({ uid: req.params.uid }).select('-password');
         if (!chercheur) return res.status(404).json({ message: 'Non trouvé' });
+
+        const user = getUserFromRequest(req);
+        
+        // Match only visible publications for this profile view
+        const matchFilter = { 'auteurs.uid': req.params.uid };
+        if (!user) {
+            matchFilter.statut = 'publie';
+        } else if (user.role === 'chercheur') {
+            if (user.uid !== req.params.uid) {
+                // Si on regarde le profil de quelqu'un d'autre, on ne voit que ses articles publiés
+                // OU ceux où le chercheur connecté est également co-auteur
+                matchFilter.$or = [
+                    { statut: 'publie' },
+                    { 'auteurs.uid': user.uid }
+                ];
+            }
+        }
+        // Admin : pas de restriction, il voit tout
+
         const publicationsAgg = await Publication.aggregate([
-            { $match: { 'auteurs.uid': req.params.uid } },
+            { $match: matchFilter },
             { $project: { 
                 pid: 1, 
                 titre: 1, 
@@ -38,7 +79,7 @@ exports.getOne = async (req, res) => {
             if (publicationsAgg[i].nb_citations >= i + 1) hIndex = i + 1; else break;
         }
 
-        const publications = await Publication.find({ 'auteurs.uid': req.params.uid }).sort({ annee: -1 });
+        const publications = await Publication.find(matchFilter).sort({ annee: -1 });
 
         // Récupérer les projets
         const projets = await Projet.find({

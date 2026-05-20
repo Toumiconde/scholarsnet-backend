@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Network as NetworkIcon, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 import api from '../lib/api';
+import { useAuth } from '../lib/AuthContext';
 
 export default function Network() {
   const fgRef = useRef();
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [windowSize, setWindowSize] = useState({ width: 800, height: 600 });
+  const { user } = useAuth();
 
   useEffect(() => {
     // Responsive canvas

@@ -33,12 +33,29 @@ export const AuthProvider = ({ children }) => {
   const demoLogin = (role) => {
     let mockUser;
     if (role === 'admin') {
-      mockUser = { uid: 'ADM001', nom: 'Administrateur', email: 'admin@uganc.edu', role: 'admin' };
+      mockUser = { uid: 'ADM001', nom: 'Administrateur', prenom: 'Système', email: 'admin@uganc.edu', role: 'admin' };
     } else {
       mockUser = { uid: 'CHR001', nom: 'Condé', prenom: 'Mamadou Alpha', email: 'm.conde@uganc.edu', role: 'chercheur', laboratoire: 'LARI' };
     }
     setUser(mockUser);
     localStorage.setItem('user', JSON.stringify(mockUser));
+    
+    // Génère un mock-token contenant le rôle et l'UID pour l'auth backend
+    const mockToken = `mock-demo-token-${mockUser.role}-${mockUser.uid}`;
+    localStorage.setItem('token', mockToken);
+    api.defaults.headers.common['Authorization'] = `Bearer ${mockToken}`;
+    
+    return true;
+  };
+
+  const demoLoginCustom = (profile) => {
+    setUser(profile);
+    localStorage.setItem('user', JSON.stringify(profile));
+    
+    const mockToken = `mock-demo-token-${profile.role}-${profile.uid}`;
+    localStorage.setItem('token', mockToken);
+    api.defaults.headers.common['Authorization'] = `Bearer ${mockToken}`;
+    
     return true;
   };
 
@@ -50,7 +67,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, demoLogin, logout }}>
+    <AuthContext.Provider value={{ user, login, demoLogin, demoLoginCustom, logout }}>
       {children}
     </AuthContext.Provider>
   );

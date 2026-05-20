@@ -1,12 +1,71 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Search, Home, User, Share2, BarChart2, Database, LogIn, LogOut } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Search, Home, User, Share2, BarChart2, Settings, LogIn, LogOut, Archive, Bell } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../lib/AuthContext';
+import api from '../lib/api';
 
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const notifRef = useRef(null);
+
+  const fetchNotifications = async () => {
+    try {
+      const { data } = await api.get('/notifications');
+      setNotifications(data);
+    } catch (err) {
+      console.error("Erreur de chargement des notifications:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+      const interval = setInterval(fetchNotifications, 20000); // refresh every 20 seconds
+      return () => clearInterval(interval);
+    } else {
+      setNotifications([]);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleNotifClick = async (notif) => {
+    try {
+      if (!notif.lu) {
+        await api.patch(`/notifications/${notif._id}/lire`);
+        setNotifications(prev => prev.map(n => n._id === notif._id ? { ...n, lu: true } : n));
+      }
+      setShowNotifDropdown(false);
+      navigate(`/publication/${notif.publicationPid}`);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await api.patch('/notifications/lire-tout');
+      setNotifications(prev => prev.map(n => ({ ...n, lu: true })));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.lu).length;
 
   const navItems = [
     { path: '/dashboard', label: 'Accueil', icon: Home },
@@ -15,8 +74,12 @@ export default function Layout() {
     { path: '/stats/LARI', label: 'Statistiques Labo', icon: BarChart2 },
   ];
 
+  if (user) {
+    navItems.push({ path: '/archive', label: 'Mes Archives', icon: Archive });
+  }
+
   if (user?.role === 'admin') {
-    navItems.push({ path: '/admin', label: 'Admin', icon: Database });
+    navItems.push({ path: '/admin', label: 'Paramètres', icon: Settings });
   }
 
   const handleLogout = () => {
@@ -73,6 +136,85 @@ export default function Layout() {
                 </div>
                 
                 <div className="flex items-center gap-4">
+                  {user && (
+                    <div className="relative" ref={notifRef}>
+                      <button 
+                        onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                        className="relative p-2 rounded-xl text-muted hover:text-white hover:bg-white/5 transition-all"
+                        title="Notifications"
+                      >
+                        <Bell size={20} />
+                        {unreadCount > 0 && (
+                          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-surface animate-pulse">
+                            {unreadCount}
+                          </span>
+                        )}
+                      </button>
+
+                      {/* Dropdown menu */}
+                      <AnimatePresence>
+                        {showNotifDropdown && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute right-0 mt-2 w-80 sm:w-96 glass-panel rounded-2xl border border-border overflow-hidden shadow-2xl z-50 py-1"
+                          >
+                            <div className="px-4 py-3 border-b border-border/60 flex justify-between items-center bg-surface/50">
+                              <span className="text-sm font-bold text-white flex items-center gap-1.5">
+                                <Bell size={16} className="text-primary" /> Notifications
+                              </span>
+                              {unreadCount > 0 && (
+                                <button 
+                                  onClick={handleMarkAllAsRead}
+                                  className="text-xs text-primary hover:underline font-semibold bg-transparent border-none cursor-pointer"
+                                >
+                                  Tout marquer comme lu
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="max-h-[360px] overflow-y-auto divide-y divide-border/40 scrollbar-thin">
+                              {notifications.length > 0 ? (
+                                notifications.map((notif) => (
+                                  <div 
+                                    key={notif._id}
+                                    onClick={() => handleNotifClick(notif)}
+                                    className={`p-4 hover:bg-white/5 transition-colors cursor-pointer relative text-left ${
+                                      !notif.lu ? 'bg-primary/5' : ''
+                                    }`}
+                                  >
+                                    {!notif.lu && (
+                                      <span className="absolute top-5 left-2.5 w-2 h-2 rounded-full bg-primary" />
+                                    )}
+                                    <div className="pl-3.5">
+                                      <p className={`text-xs leading-relaxed ${!notif.lu ? 'text-white font-medium' : 'text-muted'}`}>
+                                        {notif.texte}
+                                      </p>
+                                      <div className="flex justify-between items-center mt-2">
+                                        <span className="text-[10px] text-primary/70 uppercase font-bold tracking-wider">
+                                          {notif.type}
+                                        </span>
+                                        <span className="text-[10px] text-muted">
+                                          {new Date(notif.createdAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="p-8 text-center text-muted text-sm italic">
+                                  Aucune notification pour le moment.
+                                </div>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+
                   {user ? (
                     <>
                       <Link to={`/profile/${user.uid}`} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
