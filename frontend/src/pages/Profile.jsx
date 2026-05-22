@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Award, BookOpen, Briefcase, Mail, MapPin, Building, Edit3, Share2, Activity, Archive, RotateCcw, Trash2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { User, Award, BookOpen, Briefcase, Mail, MapPin, Building, Edit3, Share2, Activity, Archive, RotateCcw, Trash2, TrendingUp, TrendingDown } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
 
@@ -504,16 +504,39 @@ export default function Profile() {
         {/* Sidebar */}
         <div className="space-y-6">
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="glass-panel p-6">
-            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-3">
-              <Activity className="text-primary" /> Évolution (Publications)
-            </h2>
+            <div className="flex justify-between items-start mb-4">
+              <h2 className="text-xl font-bold text-white flex items-center gap-3">
+                <Activity className="text-primary" /> Croissance &amp; Évolution
+              </h2>
+              {(() => {
+                if (!statsEvolution || statsEvolution.length < 2) return null;
+                const sortedStats = [...statsEvolution].sort((a, b) => a.annee - b.annee);
+                const last = sortedStats[sortedStats.length - 1].count;
+                const prev = sortedStats[sortedStats.length - 2].count;
+                if (prev === 0) return null;
+                const growth = (((last - prev) / prev) * 100).toFixed(0);
+                const isPositive = last >= prev;
+                return (
+                  <span className={`text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1 ${isPositive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                    {isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                    {isPositive ? '+' : ''}{growth}%
+                  </span>
+                );
+              })()}
+            </div>
             <div className="h-48 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={statsEvolution || []}>
+                <AreaChart data={statsEvolution ? [...statsEvolution].sort((a,b) => a.annee - b.annee) : []}>
+                  <defs>
+                    <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.5}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
                   <XAxis dataKey="annee" stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }} cursor={{ fill: '#334155', opacity: 0.4 }} />
-                  <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                </BarChart>
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px' }} cursor={{ stroke: '#334155', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                  <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorCount)" />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </motion.div>
@@ -555,7 +578,7 @@ export default function Profile() {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }} 
             animate={{ opacity: 1, scale: 1 }} 
-            className="glass-panel w-full max-w-lg p-6 bg-surface border border-border rounded-2xl"
+            className="glass-panel w-full max-w-2xl p-6 bg-surface border border-border rounded-2xl max-h-[90vh] overflow-y-auto"
           >
             <h2 className="text-2xl font-bold text-white mb-6">Modifier le Profil</h2>
             <div className="space-y-4">
@@ -569,30 +592,55 @@ export default function Profile() {
                   <input type="text" value={formData.nom || ''} onChange={e => setFormData({...formData, nom: e.target.value})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" />
                 </div>
               </div>
+
               <div>
-                <label className="block text-sm text-muted mb-1">Grade</label>
-                <select value={formData.grade || ''} onChange={e => setFormData({...formData, grade: e.target.value})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary">
-                  <option value="Professeur">Professeur</option>
-                  <option value="Maître de conférences">Maître de conférences</option>
-                  <option value="Doctorant">Doctorant</option>
-                </select>
+                <label className="block text-sm text-muted mb-1">Email</label>
+                <input type="email" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-muted mb-1">Grade</label>
+                  <select value={formData.grade || ''} onChange={e => setFormData({...formData, grade: e.target.value})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="Professeur">Professeur</option>
+                    <option value="Maître de conférences">Maître de conférences</option>
+                    <option value="Doctorant">Doctorant</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-muted mb-1">Université</label>
+                  <input type="text" value={formData.universite || ''} onChange={e => setFormData({...formData, universite: e.target.value})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm text-muted mb-1">Laboratoire</label>
                 <input type="text" value={formData.laboratoire || ''} onChange={e => setFormData({...formData, laboratoire: e.target.value})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
+
               <div>
                 <label className="block text-sm text-muted mb-1">Domaines (séparés par des virgules)</label>
-                <input type="text" value={formData.domaines_recherche?.join(', ') || ''} onChange={e => setFormData({...formData, domaines_recherche: e.target.value.split(',').map(s=>s.trim())})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" />
+                <input type="text" value={formData.domaines_recherche?.join(', ') || ''} onChange={e => setFormData({...formData, domaines_recherche: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" />
+              </div>
+
+              <div>
+                <label className="block text-sm text-muted mb-1">Langues (séparées par des virgules)</label>
+                <input type="text" value={formData.langues?.join(', ') || ''} onChange={e => setFormData({...formData, langues: e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})} className="w-full bg-surface/50 border border-border rounded-xl py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary" placeholder="ex: Français, Anglais" />
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-8">
               <button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded-xl bg-surface border border-border text-white hover:bg-white/5 transition-colors">Annuler</button>
               <button 
-                onClick={() => {
-                  // In a real app, you would do: await api.put(`/chercheurs/${uid}`, formData);
-                  setData({ ...data, chercheur: formData });
-                  setIsEditing(false);
+                onClick={async () => {
+                  try {
+                    await api.put(`/chercheurs/${uid}`, formData);
+                    const res = await api.get(`/chercheurs/${uid}`);
+                    setData(res.data);
+                    setIsEditing(false);
+                    alert("Profil mis à jour avec succès !");
+                  } catch (err) {
+                    alert("Erreur lors de la mise à jour : " + (err.response?.data?.message || err.message));
+                  }
                 }} 
                 className="px-4 py-2 rounded-xl bg-primary text-white hover:bg-blue-600 transition-colors shadow-lg shadow-primary/25"
               >

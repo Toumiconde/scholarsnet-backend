@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock, Mail, ShieldAlert, UserCheck, ArrowLeft, Key, User, BookOpen, Globe } from 'lucide-react';
+import { Lock, Mail, ShieldAlert, UserCheck, ArrowLeft, Key, User, BookOpen, Globe, Eye, EyeOff, Shield } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import api from '../lib/api';
 
@@ -10,6 +10,8 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [mode, setMode] = useState('login'); // 'login' | 'forgot' | 'register'
+  const [showPassword, setShowPassword] = useState(false);
+  const [detectedRole, setDetectedRole] = useState(null);
   
   // Registration States
   const [regUid, setRegUid] = useState('');
@@ -21,6 +23,7 @@ export default function Login() {
   const [regDomaines, setRegDomaines] = useState('');
   const [regLangues, setRegLangues] = useState('Français');
   const [regPassword, setRegPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
   
   // Forgot Password States
   const [forgotEmail, setForgotEmail] = useState('');
@@ -28,27 +31,40 @@ export default function Login() {
   const [simulatedLink, setSimulatedLink] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { login, demoLoginCustom } = useAuth();
+  const { login, demoLogin, demoLoginCustom } = useAuth();
   const navigate = useNavigate();
 
-  const demoProfiles = [
-    { uid: 'CHR001', nom: 'Condé', prenom: 'Mamadou Alpha', email: 'm.conde@uganc.edu', role: 'chercheur', laboratoire: 'LARI', grade: 'Professeur', label: '🎓 Prof. Mamadou Alpha CONDÉ (CHR001)' },
-    { uid: 'CHR002', nom: 'Diallo', prenom: 'Fatoumata', email: 'f.diallo@uganc.edu', role: 'chercheur', laboratoire: 'LARI', grade: 'Maître de conférences', label: '🎓 Dr. Fatoumata DIALLO (CHR002)' },
-    { uid: 'CHR004', nom: 'Auteur 4', prenom: 'Auteur', email: 'a4@uganc.edu', role: 'chercheur', laboratoire: 'LARI', grade: 'Maître de conférences', label: '🎓 Auteur 4 (Chercheur - CHR004)' },
-    { uid: 'CHR005', nom: 'Auteur 5', prenom: 'Auteur', email: 'a5@uganc.edu', role: 'chercheur', laboratoire: 'LARI', grade: 'Maître de conférences', label: '🎓 Auteur 5 (Chercheur - CHR005)' },
-    { uid: 'CHR006', nom: 'Auteur 6', prenom: 'Auteur', email: 'a6@uganc.edu', role: 'chercheur', laboratoire: 'LARI', grade: 'Maître de conférences', label: '🎓 Auteur 6 (Chercheur - CHR006)' },
-    { uid: 'CHR009', nom: 'Auteur 9', prenom: 'Auteur', email: 'a9@uganc.edu', role: 'chercheur', laboratoire: 'LARI', grade: 'Professeur', label: '🎓 Auteur 9 (Chercheur - CHR009)' },
-    { uid: 'ADM001', nom: 'Admin', prenom: 'Système', email: 'admin@uganc.edu', role: 'admin', laboratoire: 'DSI', grade: 'Technicien', label: '🛡️ Administrateur Système (ADM001)' }
-  ];
 
-  const [selectedProfileUid, setSelectedProfileUid] = useState('CHR001');
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (email.trim().includes('@')) {
+        try {
+          const { data } = await api.post('/auth/check-role', { email: email.trim() });
+          console.log("Rôle détecté :", data.role);
+          setDetectedRole(data.role);
+        } catch (err) {
+          console.error("Erreur check-role :", err);
+          setDetectedRole(null);
+        }
+      } else {
+        setDetectedRole(null);
+      }
+    }, 500); // 500ms debounce
+    return () => clearTimeout(timer);
+  }, [email]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    const success = await login(email, password);
-    if (success) {
-      navigate('/dashboard');
+    const user = await login(email.trim(), password);
+    if (user) {
+      // Redirection dynamique basée sur le VRAI rôle renvoyé par la base de données
+      if (user.role === 'admin') {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     } else {
       setError('Identifiants incorrects ou serveur injoignable.');
     }
@@ -95,10 +111,21 @@ export default function Login() {
 
       const { data } = await api.post('/auth/register', payload);
       
-      // Enregistrer avec succès, passer en mode connexion et pré-remplir l'email
-      setEmail(regEmail.trim());
-      setMode('login');
-      alert(`Compte chercheur créé avec succès ! Identifiant : ${data.uid}. Vous pouvez maintenant vous connecter.`);
+      // Enregistrer avec succès, connexion automatique
+      const user = await login(regEmail.trim(), regPassword);
+      
+      if (user) {
+        if (user.role === 'admin') {
+          navigate('/admin-dashboard');
+        } else {
+          navigate('/dashboard');
+        }
+      } else {
+        // En cas d'échec de la connexion automatique
+        setEmail(regEmail.trim());
+        setMode('login');
+        alert(`Compte chercheur créé avec succès ! Identifiant : ${data.uid}. Veuillez vous connecter.`);
+      }
       
       // Reset registration form fields
       setRegUid('');
@@ -114,14 +141,7 @@ export default function Login() {
     }
   };
 
-  const handleCustomDemoLogin = () => {
-    const profile = demoProfiles.find(p => p.uid === selectedProfileUid);
-    if (profile) {
-      const { label, ...profileData } = profile;
-      demoLoginCustom(profileData);
-      navigate('/dashboard');
-    }
-  };
+
 
   return (
     <div className="min-h-[85vh] flex flex-col items-center justify-center relative pt-12 sm:pt-6 pb-12">
@@ -159,17 +179,20 @@ export default function Login() {
           )}
 
           {mode === 'login' && (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
               <div>
-                <label className="block text-sm text-muted mb-1">Email académique</label>
+                <label htmlFor="scholarsnet-email" className="block text-sm text-muted mb-1">Email académique</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
                   <input 
+                    id="scholarsnet-email"
+                    name="scholarsnet_unique_email"
                     type="email" 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full bg-surface/50 border border-border rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="m.conde@uganc.edu"
+                    placeholder="ex: a.diallo@uganc.edu"
+                    autoComplete="new-password"
                     required
                   />
                 </div>
@@ -177,7 +200,7 @@ export default function Login() {
               
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm text-muted">Mot de passe</label>
+                  <label htmlFor="scholarsnet-password" className="block text-sm text-muted">Mot de passe</label>
                   <button 
                     type="button" 
                     onClick={() => { setMode('forgot'); setError(''); }}
@@ -189,19 +212,50 @@ export default function Login() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
                   <input 
-                    type="password" 
+                    id="scholarsnet-password"
+                    name="scholarsnet_unique_password"
+                    type={showPassword ? 'text' : 'password'} 
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-surface/50 border border-border rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full bg-surface/50 border border-border rounded-xl py-3 pl-10 pr-12 text-white focus:outline-none focus:ring-2 focus:ring-primary"
                     placeholder="••••••••"
+                    autoComplete="new-password"
                     required
                   />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
               </div>
 
-              <button type="submit" className="w-full py-3 rounded-xl bg-primary text-white font-bold hover:bg-blue-600 transition-colors shadow-lg shadow-primary/25 mt-6">
-                Se connecter
-              </button>
+              {/* BUTTON AREA - DYNAMIC */}
+              <div className="mt-6">
+                {/* Petit debug visuel temporaire pour s'assurer que le code est à jour */}
+                <div className="text-[10px] text-muted text-center mb-2">
+                  Code React à jour. Rôle détecté en direct : <span className="font-bold text-primary">{detectedRole || 'aucun'}</span>
+                </div>
+
+                {(detectedRole === 'admin' && password.length > 0) ? (
+                  <motion.button 
+                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ duration: 0.4, type: 'spring', bounce: 0.5 }}
+                    type="submit" 
+                    className="w-full py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-black hover:from-amber-400 hover:to-amber-500 transition-all shadow-[0_0_30px_rgba(245,158,11,0.5)] flex items-center justify-center gap-2 border border-amber-400/50"
+                  >
+                    <Shield size={20} className="animate-pulse" /> 
+                    DÉVERROUILLER LA CONSOLE ADMIN
+                  </motion.button>
+                ) : (
+                  <button type="submit" className="w-full py-3 rounded-xl bg-primary text-white font-bold hover:bg-blue-600 transition-colors shadow-lg shadow-primary/25">
+                    Se connecter
+                  </button>
+                )}
+              </div>
 
               <div className="text-center mt-4 pt-2">
                 <span className="text-sm text-muted font-medium">Nouveau sur la plateforme ? </span>
@@ -248,7 +302,7 @@ export default function Login() {
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
                     className="w-full bg-surface/50 border border-border rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="m.conde@uganc.edu"
+                    placeholder="ex: a.diallo@uganc.edu"
                     required
                   />
                 </div>
@@ -342,7 +396,8 @@ export default function Login() {
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
                       className="w-full bg-surface/50 border border-border rounded-xl py-2.5 pl-9 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                      placeholder="Ex: a.diallo@uganc.edu"
+                      placeholder="ex: a.diallo@uganc.edu"
+                      autoComplete="off"
                       required
                     />
                   </div>
@@ -371,7 +426,7 @@ export default function Login() {
                     value={regDomaines}
                     onChange={(e) => setRegDomaines(e.target.value)}
                     className="w-full bg-surface/50 border border-border rounded-xl py-2.5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                    placeholder="Intelligence Artificielle, Big Data, Vision"
+                    placeholder="Mettez vos domaines ici"
                   />
                 </div>
 
@@ -385,7 +440,7 @@ export default function Login() {
                     value={regLangues}
                     onChange={(e) => setRegLangues(e.target.value)}
                     className="w-full bg-surface/50 border border-border rounded-xl py-2.5 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                    placeholder="Français, Anglais"
+                    placeholder="Mettez vos langues ici"
                   />
                 </div>
               </div>
@@ -396,13 +451,20 @@ export default function Login() {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
                   <input 
-                    type="password" 
+                    type={showRegPassword ? 'text' : 'password'} 
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
-                    className="w-full bg-surface/50 border border-border rounded-xl py-2.5 pl-9 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                    className="w-full bg-surface/50 border border-border rounded-xl py-2.5 pl-9 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                     placeholder="•••••••• (Min. 6 caractères)"
                     required
                   />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowRegPassword(!showRegPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-white transition-colors"
+                  >
+                    {showRegPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
 
@@ -425,35 +487,7 @@ export default function Login() {
             </form>
           )}
 
-          {mode !== 'register' && (
-            <div className="pt-6 border-t border-border space-y-4">
-              <div>
-                <p className="text-sm font-semibold text-white mb-1">Mode Démonstration (Soutenance)</p>
-                <p className="text-xs text-muted">Sélectionnez le chercheur ou administrateur de votre choix pour tester les droits d'édition.</p>
-              </div>
-              
-              <div className="space-y-3">
-                <select
-                  value={selectedProfileUid}
-                  onChange={(e) => setSelectedProfileUid(e.target.value)}
-                  className="w-full bg-surface/50 border border-border rounded-xl py-3 px-3 text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                >
-                  {demoProfiles.map(p => (
-                    <option key={p.uid} value={p.uid} className="bg-surface text-white">
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
 
-                <button 
-                  onClick={handleCustomDemoLogin}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 text-emerald-400 font-semibold hover:from-emerald-500/20 hover:to-teal-500/20 transition-all shadow-md shadow-emerald-500/5"
-                >
-                  <UserCheck size={18} /> Accéder avec ce profil
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </motion.div>
     </div>

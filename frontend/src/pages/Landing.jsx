@@ -1,9 +1,16 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Database, Share2, Search, ArrowRight, UserCheck, BookOpen, Globe, TrendingUp, Users, ShieldCheck, CheckCircle } from 'lucide-react';
+import { Database, Share2, Search, ArrowRight, UserCheck, BookOpen, Globe, TrendingUp, Users, ShieldCheck, CheckCircle, XCircle } from 'lucide-react';
 
 export default function Landing() {
+  const handleLeaveSite = () => {
+    // Tentative de fermeture de l'onglet (fonctionne si l'onglet a été ouvert par un script)
+    window.close();
+    // Fallback : Redirection vers une page neutre si la fermeture est bloquée par le navigateur
+    window.location.href = "https://www.google.com";
+  };
+
   return (
     <div className="min-h-screen">
       {/* 1. Hero Section avec Image de fond */}
@@ -38,13 +45,16 @@ export default function Landing() {
               ScholarsNet est le premier réseau social académique dédié à la valorisation, au partage et à l'analyse des publications scientifiques. Rejoignez une communauté d'excellence.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-4 pt-4">
               <Link to="/login" className="px-8 py-4 rounded-xl bg-primary text-white font-bold hover:bg-blue-600 transition-all shadow-lg shadow-primary/25 flex items-center justify-center gap-2 text-lg">
                 Espace Chercheur <ArrowRight size={20} />
               </Link>
               <Link to="/dashboard" className="px-8 py-4 rounded-xl bg-surface/50 backdrop-blur-sm border border-border text-white font-bold hover:bg-white/10 transition-all flex items-center justify-center gap-2 text-lg">
                 <Globe size={20} /> Visiter publiquement
               </Link>
+              <button onClick={handleLeaveSite} className="px-8 py-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-bold hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 text-lg">
+                <XCircle size={20} /> Quitter le site
+              </button>
             </div>
           </motion.div>
 

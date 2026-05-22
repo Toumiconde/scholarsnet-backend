@@ -1,19 +1,36 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, Database, AlertCircle, CheckCircle, FileJson, Eye, UserX, UserCheck, RotateCcw, Trash2, Archive, Settings, Key, FolderOpen, Clock, Users, RefreshCw } from 'lucide-react';
+import { Upload, Database, AlertCircle, CheckCircle, FileJson, Eye, UserX, UserCheck, RotateCcw, Trash2, Archive, Settings, Key, FolderOpen, Clock, Users, RefreshCw, Activity, UserPlus, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../lib/api';
+import { useAuth } from '../lib/AuthContext';
 
 export default function Admin() {
+  const { user } = useAuth();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [chercheurs, setChercheurs] = useState([]);
+  const [filterRole, setFilterRole] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [archivedPubs, setArchivedPubs] = useState([]);
   const [projetsActifs, setProjetsActifs] = useState([]);
   const [projetsLoading, setProjetsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('import'); // 'import', 'chercheurs', 'archive', 'projets'
+  const [activite, setActivite] = useState([]);
+  const [activiteLoading, setActiviteLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('import'); // 'import', 'chercheurs', 'archive', 'projets', 'activite'
+
+  // User Creation States
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newRole, setNewRole] = useState('chercheur');
+  const [newUid, setNewUid] = useState('');
+  const [newNom, setNewNom] = useState('');
+  const [newPrenom, setNewPrenom] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newLabo, setNewLabo] = useState('LARI');
+  const [newGrade, setNewGrade] = useState('Doctorant');
+  const [newPassword, setNewPassword] = useState('');
 
   const fetchChercheurs = async () => {
     try {
@@ -63,6 +80,18 @@ export default function Admin() {
       ]);
     } finally {
       setProjetsLoading(false);
+    }
+  };
+
+  const fetchActivite = async () => {
+    setActiviteLoading(true);
+    try {
+      const { data } = await api.get('/notifications');
+      setActivite(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Erreur chargement activité:", err);
+    } finally {
+      setActiviteLoading(false);
     }
   };
 
@@ -158,73 +187,156 @@ export default function Admin() {
     }
   };
 
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        uid: newUid,
+        nom: newNom,
+        prenom: newPrenom,
+        email: newEmail,
+        laboratoire: newRole === 'admin' ? 'ADMIN' : newLabo,
+        grade: newRole === 'admin' ? 'Professeur' : newGrade,
+        role: newRole,
+        password: newPassword,
+        domaines_recherche: [],
+        langues: []
+      };
+      await api.post('/auth/register', payload);
+      alert(`Compte ${newRole} créé avec succès !`);
+      setShowCreateForm(false);
+      setNewUid(''); setNewNom(''); setNewPrenom(''); setNewEmail(''); setNewPassword('');
+      fetchChercheurs();
+    } catch (err) {
+      alert(err.response?.data?.error || err.response?.data?.message || 'Erreur lors de la création');
+    }
+  };
+
+  const filteredChercheurs = chercheurs.filter(c => {
+    const roleMatch = filterRole === 'all' || c.role === filterRole;
+    const searchMatch = !searchQuery 
+      || (c.nom && c.nom.toLowerCase().includes(searchQuery.toLowerCase()))
+      || (c.prenom && c.prenom.toLowerCase().includes(searchQuery.toLowerCase()))
+      || (c.email && c.email.toLowerCase().includes(searchQuery.toLowerCase()))
+      || (c.uid && c.uid.toLowerCase().includes(searchQuery.toLowerCase()));
+    return roleMatch && searchMatch;
+  });
+
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
-      {/* Centered Premium Title Section */}
-      <div className="text-center space-y-3">
-        <div className="inline-flex p-3 rounded-full bg-primary/10 border border-primary/20 text-primary mb-2 shadow-lg shadow-primary/5 animate-pulse">
-          <Settings size={32} />
+    <div className="max-w-7xl mx-auto">
+      {/* Premium Title Section */}
+      <div className="flex items-center gap-4 mb-8">
+        <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20 shadow-lg shadow-primary/5">
+          <Settings size={28} className="text-primary" />
         </div>
-        <h1 className="text-4xl font-extrabold text-white tracking-tight">Paramètres Système</h1>
-        <p className="text-muted max-w-lg mx-auto">
-          Gérez l'annuaire de recherche de ScholarsNet, importez les publications DBLP et gérez le cycle de vie de la corbeille globale.
-        </p>
-      </div>
-
-      {/* Centered Segmented Control for tabs */}
-      <div className="flex justify-center">
-        <div className="p-1 rounded-2xl bg-surface/50 border border-border/80 flex gap-1 backdrop-blur-md">
-          <button
-            onClick={() => setActiveTab('import')}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all duration-300 ${
-              activeTab === 'import'
-                ? 'bg-primary text-white shadow-lg shadow-primary/25 border border-primary/40'
-                : 'text-muted hover:text-white hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <Upload size={16} /> Import DBLP
-          </button>
-          <button
-            onClick={() => setActiveTab('chercheurs')}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all duration-300 ${
-              activeTab === 'chercheurs'
-                ? 'bg-primary text-white shadow-lg shadow-primary/25 border border-primary/40'
-                : 'text-muted hover:text-white hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <UserCheck size={16} /> Chercheurs
-          </button>
-          <button
-            onClick={() => setActiveTab('archive')}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all duration-300 ${
-              activeTab === 'archive'
-                ? 'bg-primary text-white shadow-lg shadow-primary/25 border border-primary/40'
-                : 'text-muted hover:text-white hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <Archive size={16} /> Corbeille Globale
-          </button>
-          <button
-            onClick={() => { setActiveTab('projets'); fetchProjetsActifs(); }}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all duration-300 ${
-              activeTab === 'projets'
-                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 border border-emerald-400/40'
-                : 'text-muted hover:text-white hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <FolderOpen size={16} /> Projets Actifs
-            {projetsActifs.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold">
-                {projetsActifs.length}
-              </span>
-            )}
-          </button>
+        <div>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">Paramètres Système</h1>
+          <p className="text-muted text-sm mt-1">
+            Gérez l'annuaire, importez les publications et administrez le cycle de vie de la plateforme.
+          </p>
         </div>
       </div>
 
-      {/* Centered content box */}
-      <div className="flex justify-center">
-        <div className="w-full max-w-4xl">
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Sidebar Navigation */}
+        <div className="lg:w-1/4">
+          <div className="glass-panel p-3 space-y-1.5 sticky top-24 rounded-2xl">
+            <button
+              onClick={() => setActiveTab('import')}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
+                activeTab === 'import'
+                  ? 'bg-gradient-to-r from-primary/90 to-blue-600 text-white shadow-lg shadow-primary/25 border border-primary/40'
+                  : 'text-muted hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <div className={`p-2 rounded-lg ${activeTab === 'import' ? 'bg-white/20' : 'bg-surface border border-border/50'}`}>
+                <Upload size={16} />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-bold">Importation</p>
+                <p className={`text-[10px] ${activeTab === 'import' ? 'text-blue-100' : 'text-muted/70'} font-semibold uppercase tracking-wider`}>Dataset DBLP</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('chercheurs')}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
+                activeTab === 'chercheurs'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25 border border-blue-500/40'
+                  : 'text-muted hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <div className={`p-2 rounded-lg ${activeTab === 'chercheurs' ? 'bg-white/20' : 'bg-surface border border-border/50'}`}>
+                <UserCheck size={16} />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-bold">Chercheurs</p>
+                <p className={`text-[10px] ${activeTab === 'chercheurs' ? 'text-blue-100' : 'text-muted/70'} font-semibold uppercase tracking-wider`}>Annuaire & Accès</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('projets'); fetchProjetsActifs(); }}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
+                activeTab === 'projets'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-500/25 border border-emerald-500/40'
+                  : 'text-muted hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <div className={`relative p-2 rounded-lg ${activeTab === 'projets' ? 'bg-white/20' : 'bg-surface border border-border/50'}`}>
+                <FolderOpen size={16} />
+                {projetsActifs.length > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-surface">
+                    {projetsActifs.length}
+                  </span>
+                )}
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-bold">Projets</p>
+                <p className={`text-[10px] ${activeTab === 'projets' ? 'text-emerald-100' : 'text-muted/70'} font-semibold uppercase tracking-wider`}>Suivi & Statuts</p>
+              </div>
+            </button>
+
+            <button
+              onClick={() => { setActiveTab('activite'); fetchActivite(); }}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
+                activeTab === 'activite'
+                  ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-lg shadow-purple-500/25 border border-purple-500/40'
+                  : 'text-muted hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <div className={`p-2 rounded-lg ${activeTab === 'activite' ? 'bg-white/20' : 'bg-surface border border-border/50'}`}>
+                <Activity size={16} />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-bold">Activité</p>
+                <p className={`text-[10px] ${activeTab === 'activite' ? 'text-purple-100' : 'text-muted/70'} font-semibold uppercase tracking-wider`}>Logs en direct</p>
+              </div>
+            </button>
+            
+            <div className="my-2 border-t border-border/50 mx-4"></div>
+
+            <button
+              onClick={() => setActiveTab('archive')}
+              className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all ${
+                activeTab === 'archive'
+                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-lg shadow-amber-500/25 border border-amber-500/40'
+                  : 'text-muted hover:bg-white/5 hover:text-white border border-transparent'
+              }`}
+            >
+              <div className={`p-2 rounded-lg ${activeTab === 'archive' ? 'bg-white/20' : 'bg-surface border border-border/50 text-amber-500'}`}>
+                <Archive size={16} />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-bold">Corbeille</p>
+                <p className={`text-[10px] ${activeTab === 'archive' ? 'text-amber-100' : 'text-muted/70'} font-semibold uppercase tracking-wider`}>Données archivées</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Main Content Area */}
+        <div className="lg:w-3/4">
           {activeTab === 'import' && (
             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-8 space-y-6">
               <div>
@@ -294,12 +406,126 @@ export default function Admin() {
 
           {activeTab === 'chercheurs' && (
             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-8 space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                  <UserCheck className="text-secondary" /> Gestion des Chercheurs
-                </h2>
-                <p className="text-muted text-sm mt-1">Supervisez l'annuaire académique, gérez les statuts d'activité ou suspendez des profils.</p>
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                    <UserCheck className="text-secondary" /> Gestion des Utilisateurs
+                  </h2>
+                  <p className="text-muted text-sm mt-1">Supervisez l'annuaire, gérez les statuts d'activité ou créez de nouveaux comptes.</p>
+                </div>
+                <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+                  <div className="relative w-full md:w-64">
+                    <input 
+                      type="text" 
+                      placeholder="Rechercher (nom, email, UID...)"
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="w-full bg-surface/50 border border-border/60 text-white text-sm rounded-xl pl-10 pr-3 py-2 outline-none focus:border-primary transition-colors"
+                    />
+                    <Users size={16} className="absolute left-3 top-2.5 text-muted" />
+                  </div>
+                  <select 
+                    value={filterRole} 
+                    onChange={e => setFilterRole(e.target.value)}
+                    className="bg-surface/50 border border-border/60 text-white text-sm rounded-xl px-3 py-2 outline-none focus:border-primary transition-colors"
+                  >
+                    <option value="all">Tous les rôles</option>
+                    <option value="chercheur">Chercheurs uniquement</option>
+                    <option value="admin">Administrateurs uniquement</option>
+                  </select>
+                  <button 
+                    onClick={() => {
+                      setShowCreateForm(!showCreateForm);
+                      if (!showCreateForm) {
+                        setNewUid(`CHR${Math.floor(100 + Math.random() * 900)}`);
+                      }
+                    }}
+                    className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-colors text-sm font-semibold flex-1 md:flex-none"
+                  >
+                    {showCreateForm ? <><X size={16}/> Fermer</> : <><UserPlus size={16}/> Nouveau</>}
+                  </button>
+                </div>
               </div>
+
+              {showCreateForm && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-surface/30 border border-blue-500/30 rounded-2xl p-6">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <UserPlus size={20} className="text-blue-400" />
+                    Créer un nouveau compte (Chercheur ou Administrateur)
+                  </h3>
+                  <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div><label className="block text-xs text-muted mb-1">Rôle</label>
+                      <select 
+                        value={newRole} 
+                        onChange={e => {
+                          setNewRole(e.target.value);
+                          const prefix = e.target.value === 'admin' ? 'ADM' : 'CHR';
+                          const randomNum = Math.floor(100 + Math.random() * 900);
+                          setNewUid(`${prefix}${randomNum}`);
+                        }} 
+                        className="w-full bg-surface border border-border rounded-lg p-2.5 text-white text-sm focus:ring-2 focus:ring-primary outline-none"
+                      >
+                        <option value="chercheur">Chercheur</option>
+                        <option value="admin">Administrateur</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-muted mb-1 flex items-center justify-between">
+                        <span>Identifiant (UID)</span>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            const prefix = newRole === 'admin' ? 'ADM' : 'CHR';
+                            setNewUid(`${prefix}${Math.floor(100 + Math.random() * 900)}`);
+                          }}
+                          className="text-emerald-400 hover:text-emerald-300 hover:underline flex items-center gap-1"
+                          title="Générer un nouvel identifiant"
+                        >
+                          <RefreshCw size={10} /> Générer
+                        </button>
+                      </label>
+                      <input 
+                        type="text" 
+                        value={newUid} 
+                        readOnly 
+                        className="w-full bg-surface/50 border border-border/50 rounded-lg p-2.5 text-white/50 text-sm outline-none cursor-not-allowed font-mono" 
+                        placeholder="Cliquez sur Générer"
+                      />
+                    </div>
+                    <div><label className="block text-xs text-muted mb-1">Prénom</label>
+                      <input type="text" value={newPrenom} onChange={e=>setNewPrenom(e.target.value)} required className="w-full bg-surface border border-border rounded-lg p-2.5 text-white text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="Prénom"/>
+                    </div>
+                    <div><label className="block text-xs text-muted mb-1">Nom</label>
+                      <input type="text" value={newNom} onChange={e=>setNewNom(e.target.value)} required className="w-full bg-surface border border-border rounded-lg p-2.5 text-white text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="Nom"/>
+                    </div>
+                    <div><label className="block text-xs text-muted mb-1">Email</label>
+                      <input type="email" value={newEmail} onChange={e=>setNewEmail(e.target.value)} required className="w-full bg-surface border border-border rounded-lg p-2.5 text-white text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="ex: a.diallo@uganc.edu"/>
+                    </div>
+                    <div><label className="block text-xs text-muted mb-1">Mot de passe provisoire</label>
+                      <input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} required className="w-full bg-surface border border-border rounded-lg p-2.5 text-white text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="•••••••• (Min. 6 caractères)"/>
+                    </div>
+                    {newRole === 'chercheur' && (
+                      <>
+                        <div><label className="block text-xs text-muted mb-1">Grade</label>
+                          <select value={newGrade} onChange={e=>setNewGrade(e.target.value)} className="w-full bg-surface border border-border rounded-lg p-2.5 text-white text-sm focus:ring-2 focus:ring-primary outline-none">
+                            <option value="Doctorant">Doctorant</option>
+                            <option value="Maître de conférences">Maître de conférences</option>
+                            <option value="Professeur">Professeur</option>
+                          </select>
+                        </div>
+                        <div><label className="block text-xs text-muted mb-1">Laboratoire</label>
+                          <input type="text" value={newLabo} onChange={e=>setNewLabo(e.target.value)} required className="w-full bg-surface border border-border rounded-lg p-2.5 text-white text-sm focus:ring-2 focus:ring-primary outline-none" placeholder="Laboratoire"/>
+                        </div>
+                      </>
+                    )}
+                    <div className="md:col-span-2 flex justify-end mt-2">
+                      <button type="submit" className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-colors">
+                        Créer le compte
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              )}
               
               <div className="overflow-x-auto border border-border/60 rounded-2xl bg-surface/20">
                 <table className="w-full text-left border-collapse">
@@ -314,7 +540,7 @@ export default function Admin() {
                     </tr>
                   </thead>
                   <tbody>
-                    {chercheurs.map((c, i) => (
+                    {filteredChercheurs.map((c, i) => (
                       <tr key={c.uid || i} className="border-b border-border/10 hover:bg-white/[0.01] transition-colors">
                         <td className="py-4 px-6 text-white font-mono text-sm">{c.uid}</td>
                         <td className="py-4 px-6 text-white font-medium">
@@ -342,7 +568,7 @@ export default function Admin() {
                           >
                             <Eye size={16} />
                           </Link>
-                          {c.role !== 'admin' && (
+                          {(!user || c.uid !== user.uid) && (
                             <>
                               <button 
                                 onClick={() => handleToggleActif(c.uid, c.actif !== false)}
@@ -532,6 +758,67 @@ export default function Admin() {
                       )}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === 'activite' && (
+            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="glass-panel p-8 space-y-6 border-purple-500/20">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                    <Activity className="text-purple-400" /> Journal d'Activité Global
+                  </h2>
+                  <p className="text-muted text-sm mt-1">Supervisez les connexions, déconnexions et les actions importantes de tous les chercheurs en temps réel.</p>
+                </div>
+                <button
+                  onClick={fetchActivite}
+                  disabled={activiteLoading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 transition-colors text-sm font-semibold"
+                >
+                  <RefreshCw size={14} className={activiteLoading ? 'animate-spin' : ''} /> Actualiser
+                </button>
+              </div>
+
+              {activiteLoading ? (
+                <div className="flex items-center justify-center py-12 gap-3 text-muted">
+                  <RefreshCw size={20} className="animate-spin" />
+                  <span>Chargement de l'historique...</span>
+                </div>
+              ) : (
+                <div className="overflow-hidden border border-border/60 rounded-2xl bg-surface/20">
+                  <div className="max-h-[500px] overflow-y-auto p-2 space-y-2 custom-scrollbar">
+                    {activite.map((notif, i) => (
+                      <div key={notif._id || i} className="p-4 bg-surface rounded-xl border border-border/40 hover:border-purple-500/30 transition-colors flex gap-4 items-start">
+                        <div className={`p-2 rounded-lg mt-1 shrink-0 ${
+                            notif.type === 'connexion' ? 'bg-emerald-500/10 text-emerald-400' :
+                            notif.type === 'deconnexion' ? 'bg-slate-500/10 text-slate-400' :
+                            notif.type === 'nouvelle_publication' ? 'bg-blue-500/10 text-blue-400' :
+                            notif.type === 'mise_a_jour' ? 'bg-amber-500/10 text-amber-400' :
+                            notif.type === 'reaction' ? 'bg-pink-500/10 text-pink-400' :
+                            'bg-purple-500/10 text-purple-400'
+                        }`}>
+                           <Activity size={16} />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start mb-1">
+                            <span className="font-bold text-gray-200 text-sm">{notif.emetteur}</span>
+                            <span className="text-xs text-muted font-mono">{new Date(notif.createdAt).toLocaleString('fr-FR')}</span>
+                          </div>
+                          <p className="text-sm text-gray-400 leading-relaxed">{notif.texte}</p>
+                          {notif.publicationTitre && (
+                             <div className="mt-2 text-xs text-primary bg-primary/10 border border-primary/20 px-2 py-1 rounded inline-block">
+                               Source : {notif.publicationTitre}
+                             </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {activite.length === 0 && (
+                      <div className="py-12 text-center text-muted italic text-sm">Aucune activité enregistrée pour le moment.</div>
+                    )}
+                  </div>
                 </div>
               )}
             </motion.div>

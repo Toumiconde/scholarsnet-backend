@@ -22,7 +22,7 @@ const getUserFromRequest = (req) => {
     }
 };
 
-async function triggerVisitorNotification(pub, type, emetteur, detailsText) {
+async function triggerNotification(pub, type, emetteur, detailsText) {
     try {
         const uids = (pub.auteurs || []).map(a => a.uid).filter(Boolean);
         const notificationsToCreate = [];
@@ -50,10 +50,10 @@ async function triggerVisitorNotification(pub, type, emetteur, detailsText) {
         });
         
         if (notificationsToCreate.length > 0) {
-            await Notification.insertMany(notificationsToCreate);
+            await Notification.create(notificationsToCreate);
         }
     } catch (err) {
-        console.error("Erreur triggerVisitorNotification:", err);
+        console.error("Erreur triggerNotification:", err);
     }
 }
 
@@ -74,6 +74,7 @@ exports.getAll = async (req, res) => {
             { mots_cles: { $regex: q, $options: 'i' } }
         ];
         if (auteur) filter['auteurs.nom'] = { $regex: auteur, $options: 'i' };
+        if (req.query.uid) filter['auteurs.uid'] = req.query.uid;
         if (annee) filter.annee = parseInt(annee);
         if (type) filter.type = type;
 
@@ -132,8 +133,17 @@ exports.getOne = async (req, res) => {
         const Chercheur = require('../models/Chercheur');
         const enrichedAuteurs = await Promise.all((pub.auteurs || []).map(async (auteur) => {
             if (auteur.uid) {
-                const chercheur = await Chercheur.findOne({ uid: auteur.uid }, 'email').lean();
-                return { ...auteur, email: chercheur ? chercheur.email : null };
+                const chercheur = await Chercheur.findOne({ uid: auteur.uid }, 'email nom prenom photo universite laboratoire domaines_recherche').lean();
+                if (chercheur) {
+                    return { 
+                        ...auteur, 
+                        email: chercheur.email,
+                        photo: chercheur.photo,
+                        universite: chercheur.universite,
+                        laboratoire: chercheur.laboratoire,
+                        domaines_recherche: chercheur.domaines_recherche
+                    };
+                }
             }
             return { ...auteur, email: null };
         }));
@@ -182,6 +192,13 @@ exports.create = async (req, res) => {
         }
 
         const pub = await Publication.create(req.body);
+
+        // Envoyer une notification pour la création (brouillon ou autre)
+        const Chercheur = require('../models/Chercheur');
+        const chercheur = await Chercheur.findOne({ uid: req.user.uid });
+        const emetteur = chercheur ? `${chercheur.prenom} ${chercheur.nom}` : 'Admin';
+        await triggerNotification(pub, 'nouvelle_publication', emetteur, `${emetteur} a créé la publication "${pub.titre}" avec le statut "${pub.statut}".`);
+
         res.status(201).json(pub);
     } catch (err) {
         res.status(400).json({ error: err.message });
@@ -220,6 +237,13 @@ exports.update = async (req, res) => {
         const updatedPub = await Publication.findOneAndUpdate(
             { pid: req.params.pid }, req.body, { new: true }
         );
+
+        // Envoyer une notification de mise à jour (ajout de co-auteur, etc)
+        const Chercheur = require('../models/Chercheur');
+        const chercheur = await Chercheur.findOne({ uid: req.user.uid });
+        const emetteur = chercheur ? `${chercheur.prenom} ${chercheur.nom}` : 'Admin';
+        await triggerNotification(updatedPub, 'mise_a_jour', emetteur, `${emetteur} a mis à jour la publication "${updatedPub.titre}" (Auteurs potentiellement modifiés, statut: ${updatedPub.statut}).`);
+
         res.json(updatedPub);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -318,11 +342,9 @@ exports.addComment = async (req, res) => {
         pub.commentaires.push(nouveauCommentaire);
         await pub.save();
 
-        if (!user) {
-            const emetteur = nomFinal;
-            const detailsText = `Le visiteur "${emetteur}" a commenté votre publication "${pub.titre}".`;
-            await triggerVisitorNotification(pub, 'commentaire', emetteur, detailsText);
-        }
+        const emetteur = nomFinal;
+        const detailsText = `${emetteur} a commenté la publication "${pub.titre}".`;
+        await triggerNotification(pub, 'commentaire', emetteur, detailsText);
 
         // On retourne le token AU VISITEUR pour qu'il puisse supprimer son commentaire
         const saved = pub.commentaires[pub.commentaires.length - 1];
@@ -363,11 +385,9 @@ exports.addReply = async (req, res) => {
         comment.replies.push({ texte, auteur_nom: nomFinal, auteur_uid: uidFinal, token, date: new Date(), replies: [] });
         await pub.save();
 
-        if (!user) {
-            const emetteur = nomFinal;
-            const detailsText = `Le visiteur "${emetteur}" a répondu à un commentaire sur votre publication "${pub.titre}".`;
-            await triggerVisitorNotification(pub, 'commentaire', emetteur, detailsText);
-        }
+        const emetteur = nomFinal;
+        const detailsText = `${emetteur} a répondu à un commentaire sur la publication "${pub.titre}".`;
+        await triggerNotification(pub, 'commentaire', emetteur, detailsText);
 
         const savedReply = comment.replies[comment.replies.length - 1];
         res.status(201).json({ commentaires: pub.commentaires, token, replyId: savedReply._id });
@@ -478,6 +498,12 @@ exports.publier = async (req, res) => {
             { new: true }
         );
 
+        // Notification de publication
+        const Chercheur = require('../models/Chercheur');
+        const chercheur = await Chercheur.findOne({ uid: req.user.uid });
+        const emetteur = chercheur ? `${chercheur.prenom} ${chercheur.nom}` : 'Admin';
+        await triggerNotification(updatedPub, 'statut_publication', emetteur, `${emetteur} a publié officiellement la recherche "${updatedPub.titre}".`);
+
         res.json({ message: 'Publication publiée avec succès.', publication: updatedPub });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -517,6 +543,12 @@ exports.retirer = async (req, res) => {
             { statut: 'en_cours', $unset: { date_publication: '' } },
             { new: true }
         );
+
+        // Notification de retrait
+        const Chercheur = require('../models/Chercheur');
+        const chercheur = await Chercheur.findOne({ uid: req.user.uid });
+        const emetteur = chercheur ? `${chercheur.prenom} ${chercheur.nom}` : 'Admin';
+        await triggerNotification(updatedPub, 'statut_publication', emetteur, `${emetteur} a retiré la publication "${updatedPub.titre}" (Repassée en brouillon).`);
 
         res.json({ message: 'Publication retirée. Elle est de nouveau en cours de rédaction.', publication: updatedPub });
     } catch (err) {
@@ -579,11 +611,15 @@ exports.addReaction = async (req, res) => {
         await pub.save();
 
         const user = getUserFromRequest(req);
-        if (!user) {
-            const emetteur = 'Visiteur anonyme';
-            const detailsText = `Un visiteur a réagi avec "${type}" à votre publication "${pub.titre}".`;
-            await triggerVisitorNotification(pub, 'reaction', emetteur, detailsText);
+        let emetteur = 'Visiteur anonyme';
+        if (user) {
+            const Chercheur = require('../models/Chercheur');
+            const chercheur = await Chercheur.findOne({ uid: user.uid });
+            if (chercheur) emetteur = `${chercheur.prenom} ${chercheur.nom}`;
         }
+
+        const detailsText = `${emetteur} a réagi avec "${type}" à la publication "${pub.titre}".`;
+        await triggerNotification(pub, 'reaction', emetteur, detailsText);
 
         res.json({ reactions: pub.reactions });
     } catch (err) {
@@ -611,10 +647,13 @@ exports.partager = async (req, res) => {
         if (!user) {
             const emetteur = 'Visiteur anonyme';
             const detailsText = `Un visiteur a partagé le lien de votre publication "${pub.titre}".`;
-            await triggerVisitorNotification(updated, 'partage', emetteur, detailsText);
-        }
+            // Notification de partage
+            await triggerNotification(updated, 'partage', emetteur, detailsText);
 
-        res.json({ partages: updated.partages });
+            res.json({ message: 'Publication partagée avec succès', publication: updated });
+        } else {
+            res.json({ partages: updated.partages });
+        }
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

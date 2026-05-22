@@ -7,15 +7,18 @@ import Profile from './pages/Profile';
 import Network from './pages/Network';
 import LabStats from './pages/LabStats';
 import Admin from './pages/Admin';
+import AdminDashboard from './pages/AdminDashboard';
 import Login from './pages/Login';
 import Landing from './pages/Landing';
 import PublicationDetail from './pages/PublicationDetail';
 import Archive from './pages/Archive';
 import ResetPassword from './pages/ResetPassword';
 import { AuthProvider } from './lib/AuthContext';
+import { ThemeProvider } from './lib/ThemeContext';
 
 function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <Router>
         <Routes>
@@ -28,6 +31,7 @@ function App() {
             <Route path="network" element={<Network />} />
             <Route path="stats/:labo" element={<LabStats />} />
             <Route path="admin" element={<Admin />} />
+            <Route path="admin-dashboard" element={<AdminDashboard />} />
             <Route path="archive" element={<Archive />} />
             <Route path="login" element={<Login />} />
             <Route path="reset-password/:token" element={<ResetPassword />} />
@@ -35,6 +39,7 @@ function App() {
         </Routes>
       </Router>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 

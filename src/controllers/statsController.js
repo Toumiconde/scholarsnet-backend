@@ -182,3 +182,49 @@ exports.keywords = async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 };
+
+// Pipeline 6 — KPIs globaux (Réel)
+exports.kpis = async (req, res) => {
+    try {
+        const labo = req.params.labo;
+        const chercheursLabo = await Chercheur.find({ laboratoire: labo }).select('uid actif');
+        const uids = chercheursLabo.map(c => c.uid);
+        const chercheursActifs = chercheursLabo.filter(c => c.actif).length;
+
+        const publications = await Publication.find({
+            'auteurs.uid': { $in: uids },
+            statut: 'publie'
+        }).select('pid citations annee');
+
+        const publicationsTotales = publications.length;
+
+        let totalCitations = 0;
+        let pubsThisYear = 0;
+        let pubsLastYear = 0;
+        const currentYear = new Date().getFullYear();
+
+        publications.forEach(pub => {
+            totalCitations += pub.citations ? pub.citations.length : 0;
+            if (pub.annee === currentYear) pubsThisYear++;
+            if (pub.annee === currentYear - 1) pubsLastYear++;
+        });
+
+        let croissance = 0;
+        if (pubsLastYear > 0) {
+            croissance = Math.round(((pubsThisYear - pubsLastYear) / pubsLastYear) * 100);
+        } else if (pubsThisYear > 0) {
+            croissance = 100;
+        }
+        
+        const croissanceStr = croissance > 0 ? `+${croissance}%` : `${croissance}%`;
+
+        res.json({
+            publicationsTotales,
+            chercheursActifs,
+            citations: totalCitations,
+            croissance: croissanceStr
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};

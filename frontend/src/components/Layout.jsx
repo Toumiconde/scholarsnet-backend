@@ -1,14 +1,16 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Search, Home, User, Share2, BarChart2, Settings, LogIn, LogOut, Archive, Bell } from 'lucide-react';
+import { Search, Home, User, Share2, BarChart2, Settings, LogIn, LogOut, Archive, Bell, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../lib/AuthContext';
+import { useTheme } from '../lib/ThemeContext';
 import api from '../lib/api';
 
 export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   const [notifications, setNotifications] = useState([]);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
@@ -67,19 +69,41 @@ export default function Layout() {
 
   const unreadCount = notifications.filter(n => !n.lu).length;
 
-  const navItems = [
-    { path: '/dashboard', label: 'Accueil', icon: Home },
-    { path: '/search', label: 'Recherche', icon: Search },
-    { path: '/network', label: 'Réseau', icon: Share2 },
-    { path: '/stats/LARI', label: 'Statistiques Labo', icon: BarChart2 },
-  ];
-
-  if (user) {
-    navItems.push({ path: '/archive', label: 'Mes Archives', icon: Archive });
+  const isSearch = location.pathname.startsWith('/search');
+  const isPublication = location.pathname.startsWith('/publication');
+  const isSearchOrPublication = isSearch || isPublication;
+  
+  let networkPath = '/network';
+  if (isPublication) {
+    const pid = location.pathname.split('/')[2];
+    if (pid) networkPath = `/network?pid=${pid}`;
   }
 
+  const navItems = [];
+
   if (user?.role === 'admin') {
+    // Menu complet pour l'Administrateur (accès à tout)
+    navItems.push({ path: '/admin-dashboard', label: 'Tableau de Bord', icon: BarChart2 });
+    navItems.push({ path: '/search', label: 'Recherche', icon: Search });
+    navItems.push({ path: networkPath, label: 'Réseau', icon: Share2 });
+    navItems.push({ path: '/stats/LARI', label: 'Statistiques Labo', icon: BarChart2 });
     navItems.push({ path: '/admin', label: 'Paramètres', icon: Settings });
+  } else {
+    // Menu pour les chercheurs et visiteurs
+    navItems.push({ path: '/dashboard', label: 'Accueil', icon: Home });
+    navItems.push({ path: '/search', label: 'Recherche', icon: Search });
+
+    if (user || isPublication) {
+      navItems.push({ path: networkPath, label: 'Réseau', icon: Share2 });
+    }
+
+    if (!(!user && isSearchOrPublication)) {
+      navItems.push({ path: '/stats/LARI', label: 'Statistiques Labo', icon: BarChart2 });
+    }
+
+    if (user) {
+      navItems.push({ path: '/archive', label: 'Mes Archives', icon: Archive });
+    }
   }
 
   const handleLogout = () => {
@@ -135,7 +159,15 @@ export default function Layout() {
                   })}
                 </div>
                 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  {/* Bouton Mode Clair / Sombre */}
+                  <button
+                    onClick={toggleTheme}
+                    className="p-2 rounded-xl text-muted hover:text-white hover:bg-white/5 transition-all"
+                    title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+                  >
+                    {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+                  </button>
                   {user && (
                     <div className="relative" ref={notifRef}>
                       <button 

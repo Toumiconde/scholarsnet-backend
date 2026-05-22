@@ -128,15 +128,15 @@ exports.update = async (req, res) => {
     }
 };
 
-// Désactiver
+// Désactiver / Supprimer
 exports.remove = async (req, res) => {
     try {
-        // Sécurité : Seul l'admin ou le propriétaire peut désactiver
+        // Sécurité : Seul l'admin ou le propriétaire peut désactiver/supprimer
         if (req.user.uid !== req.params.uid && req.user.role !== 'admin') {
             return res.status(403).json({ message: "Action non autorisée" });
         }
-        await Chercheur.findOneAndUpdate({ uid: req.params.uid }, { actif: false });
-        res.json({ message: 'Compte désactivé' });
+        await Chercheur.findOneAndDelete({ uid: req.params.uid });
+        res.json({ message: 'Compte définitivement supprimé' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

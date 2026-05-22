@@ -6,5 +6,6 @@ router.get('/labo/:nom', ctrl.statsLabo);
 router.get('/top-auteurs', ctrl.topAuteurs);
 router.get('/citations/:pid', ctrl.citations);
 router.get('/keywords/:labo', ctrl.keywords);
+router.get('/kpis/:labo', ctrl.kpis);
 
 module.exports = router;

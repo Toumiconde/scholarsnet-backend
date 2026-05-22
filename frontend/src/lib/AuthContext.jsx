@@ -7,12 +7,25 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Check if token exists in localStorage
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
+      // Set stored user immediately so UI doesn't flash
+      const parsed = JSON.parse(storedUser);
+      setUser(parsed);
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      // Re-fetch full profile from API to always have the latest role
+      api.get('/auth/me').then(({ data }) => {
+        const fresh = { ...parsed, ...data };
+        setUser(fresh);
+        localStorage.setItem('user', JSON.stringify(fresh));
+      }).catch(() => {
+        // If /auth/me fails (expired token), clear session
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setUser(null);
+      });
     }
   }, []);
 
@@ -23,7 +36,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(data.chercheur));
       api.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
       setUser(data.chercheur);
-      return true;
+      return data.chercheur;
     } catch (err) {
       console.error(err);
       return false;
@@ -59,7 +72,12 @@ export const AuthProvider = ({ children }) => {
     return true;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (err) {
+      console.error('Erreur lors de la déconnexion backend', err);
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     delete api.defaults.headers.common['Authorization'];

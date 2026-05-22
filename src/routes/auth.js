@@ -4,6 +4,8 @@ const protect = require('../middleware/authMiddleware');
 
 router.post('/register', ctrl.register);
 router.post('/login', ctrl.login);
+router.post('/check-role', ctrl.checkRole);
+router.post('/logout', protect, ctrl.logout);
 router.get('/me', protect, ctrl.me);
 router.post('/forgot-password', ctrl.forgotPassword);
 router.post('/reset-password/:token', ctrl.resetPassword);
